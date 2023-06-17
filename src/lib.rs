@@ -1,5 +1,6 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+#[no_mangle]
+pub extern "C" fn add_numbers(a: i32, b: i32) -> i32 {
+    a + b + 4
 }
 
 #[cfg(test)]
@@ -8,7 +9,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let result = add(2, 2);
+        let result = add_numbers(2, 2);
         assert_eq!(result, 4);
     }
 }
