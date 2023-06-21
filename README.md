@@ -1,9 +1,28 @@
 # react-native-rs
 
-write code rust
+rust ios
+========
+
+rust 와 react-native[ios]
+device에서 테스트완료
+
+
+
+사용법
+----
+
+
 sh ./scripts/rust_ios.sh
 
+* rust_lib
+   * lib_rust.a
+   * MyRustModule.m
+   * rust_module.h   
+
+
 XCode 
+-----
+
 1. move ./rust_module/rust_libs to ios/
 
 XCode Setting
