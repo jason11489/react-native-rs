@@ -23,7 +23,7 @@ sh ./scripts/rust_ios.sh
 XCode 
 -----
 
-1. move ./rust_module/rust_libs to ios/
+1. cp [./rust_module/rust_libs] to [ios/]
 
 XCode Setting
 1. [ Build Phases ] Link Binary With Libraries
