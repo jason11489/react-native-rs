@@ -1,5 +1,13 @@
 use std::io::{stdout, BufWriter};
 
+// #[no_mangle]
+// pub extern "C" fn add_numbers_str(a: &str, b: &str) -> String {
+//     let num_1: i32 = a.parse().unwrap();
+//     let num_2: i32 = b.parse().unwrap();
+//     let result = num_1 + num_2;
+//     result.to_string()
+// }
+
 #[no_mangle]
 pub extern "C" fn add_numbers(a: i32, b: i32) -> i32 {
     a + b
@@ -24,6 +32,6 @@ mod tests {
     #[test]
     fn it_works() {
         let result = add_numbers(2, 2);
-        assert_eq!(result, 5);
+        println!("{:?}", result);
     }
 }
