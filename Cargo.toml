@@ -9,4 +9,27 @@ name = "my_rust_module"
 crate-type = ["staticlib"]
 
 [dependencies]
-ferris-says = "0.1"
+ferris-says = "0.3.1"
+ark-crypto-primitives = {version = "0.4.0", default-features = true, features = [ "r1cs", "encryption", "crh", "merkle_tree" ]}
+ark-ec = "0.4.2"
+ark-ed-on-bls12-381 = {version = "^0.4.0", features = [ "r1cs" ]}
+ark-ed-on-bn254 = {version = "^0.4.0", features = [ "r1cs" ]}
+ark-ff = "0.4.2"
+ark-groth16 = "0.4.0"
+ark-poly = "0.4.2"
+ark-r1cs-std = "0.4.0"
+ark-relations = "0.4.0"
+ark-serialize = "0.4.2"
+ark-std = "0.4.0"
+derivative = "2.2.0"
+ark-bn254 = "0.4.0"
+
+[dev-dependencies]
+ark-bls12-381 = "0.4.0"
+num-bigint = "0.4.3"
+
+[features]
+default = ["ark-crypto-primitives/r1cs"]
+
+[profile.release]
+opt-level = 3
