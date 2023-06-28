@@ -182,9 +182,6 @@ where
     }
 }
 
-//==============================================================================================================
-//==============================================================================================================
-//==============================================================================================================
 use crate::gadget::hashes::CRHScheme;
 type C = ark_ed_on_bn254::EdwardsProjective;
 type GG = ark_ed_on_bn254::constraints::EdwardsVar;
@@ -195,7 +192,7 @@ type H = mimc7::MiMC<F>;
 type SEEnc = symmetric::SymmetricEncryptionScheme<F>;
 
 #[allow(non_snake_case)]
-fn generate_test_input() -> Result<Registerdata<C, GG>, Error> {
+pub fn generate_test_input() -> Result<Registerdata<C, GG>, Error> {
     let rng = &mut test_rng();
     let rc: mimc7::Parameters<F> = mimc7::Parameters {
         round_constants: mimc7::parameters::get_bn256_round_constants(),
@@ -251,8 +248,6 @@ fn test_Data() {
         Groth16::<Bn254>::setup(c, &mut rng).unwrap()
     };
 
-    // println!("\npk = {:?}\n", vk);
-
     println!("\nPrepared verifying key!\n");
     let pvk = Groth16::<Bn254>::process_vk(&vk).unwrap();
 
@@ -268,9 +263,32 @@ fn test_Data() {
         test_input.pk_peer_own.clone().unwrap(),
     ];
     image.append(&mut vec![test_input.h_ct.clone().unwrap()]);
-    // image.append(&mut test_input.cin.clone().unwrap());
 
     let tmp = Groth16::<Bn254>::verify_with_processed_vk(&pvk, &image, &proof).unwrap();
     let tmp2 = Groth16::<Bn254>::verify(&vk, &image, &proof).unwrap();
     println!("\nresult = {:?}", tmp);
+}
+
+use std::str::FromStr;
+
+#[test]
+fn test_string_to_Fr() {
+    let rng = &mut test_rng();
+
+    let fr_value: F = F::rand(rng);
+
+    // Fr 값을 문자열로 저장
+    let fr_string: String = fr_value.to_string();
+    println!("Fr 값을 문자열로 저장: {}", fr_string);
+
+    // 문자열을 Fr 값으로 변환
+    let fr_value_parsed: Result<F, _> = F::from_str(&fr_string);
+    match fr_value_parsed {
+        Ok(parsed_value) => {
+            println!("문자열을 Fr 값으로 변환: {}", parsed_value);
+        }
+        Err(_) => {
+            println!("잘못된 문자열입니다.");
+        }
+    }
 }
