@@ -38,7 +38,7 @@ use ark_std::marker::PhantomData;
 pub type ConstraintF<C> = <<C as CurveGroup>::BaseField as Field>::BasePrimeField;
 #[allow(non_snake_case)]
 #[derive(Clone)]
-pub struct Tiger<C: CurveGroup, GG: CurveVar<C, ConstraintF<C>>>
+pub struct Dog<C: CurveGroup, GG: CurveVar<C, ConstraintF<C>>>
 where
     <C as CurveGroup>::BaseField: PrimeField + Absorb,
 {
@@ -47,18 +47,15 @@ where
 
     // public
     pub h_ct: Option<C::BaseField>,
-    pub h_k_data: Option<C::BaseField>,
-    pub pk_peer_own: Option<C::BaseField>,
 
     // witness
-    pub k_data: Option<C::BaseField>,
     pub ct_data: Option<C::BaseField>,
 
     pub _curve_var: PhantomData<GG>,
 }
 
 #[allow(non_snake_case)]
-impl<C, GG> ConstraintSynthesizer<C::BaseField> for Tiger<C, GG>
+impl<C, GG> ConstraintSynthesizer<C::BaseField> for Dog<C, GG>
 where
     C: CurveGroup,
     GG: CurveVar<C, C::BaseField>,
@@ -68,7 +65,7 @@ where
     fn generate_constraints(
         self,
         cs: ark_relations::r1cs::ConstraintSystemRef<C::BaseField>,
-    ) -> Result<(), SynthesisError> {
+    ) -> ark_relations::r1cs::Result<()> {
         //==============================================================================================================
 
         let rc_tmp = hashes::mimc7::Parameters {
@@ -80,27 +77,6 @@ where
         )
         .unwrap();
         //==============================================================================================================
-        //h_k_data == Hash(pk_peer_own || k_data)
-
-        let h_k_data = FpVar::new_input(ark_relations::ns!(cs, "h_k_data"), || {
-            Ok(self.h_k_data.unwrap())
-        })
-        .unwrap();
-
-        let pk_peer_own = FpVar::new_input(ark_relations::ns!(cs, "pk_peer_own"), || {
-            Ok(self.pk_peer_own.unwrap())
-        })
-        .unwrap();
-
-        let binding = self.k_data.unwrap();
-        let k_data_binding =
-            FpVar::new_witness(ark_relations::ns!(cs, "k_data"), || Ok(binding)).unwrap();
-
-        let hash_input = [pk_peer_own, k_data_binding].to_vec();
-        let result_h_k_data =
-            MiMCGadget::<C::BaseField>::evaluate(&rc.clone(), &hash_input).unwrap();
-
-        result_h_k_data.enforce_equal(&h_k_data).unwrap();
 
         //==============================================================================================================
 
@@ -114,7 +90,7 @@ where
             FpVar::new_witness(ark_relations::ns!(cs, "ct_data"), || Ok(ct_data_binding)).unwrap();
 
         let result_h_ct =
-            MiMCGadget::<C::BaseField>::evaluate(&rc.clone(), &[ct_data.clone()].to_vec()).unwrap();
+            MiMCGadget::<C::BaseField>::evaluate(&rc, &[ct_data.clone()].to_vec()).unwrap();
 
         result_h_ct.enforce_equal(&h_ct)
     }
@@ -133,7 +109,7 @@ type H = mimc7::MiMC<F>;
 type SEEnc = symmetric::SymmetricEncryptionScheme<F>;
 
 #[allow(non_snake_case)]
-fn generate_test_input() -> Result<Tiger<C, GG>, Error> {
+fn generate_test_input() -> Result<Dog<C, GG>, Error> {
     let rng = &mut test_rng();
     let rc: mimc7::Parameters<F> = mimc7::Parameters {
         round_constants: mimc7::parameters::get_bn256_round_constants(),
@@ -150,27 +126,23 @@ fn generate_test_input() -> Result<Tiger<C, GG>, Error> {
     let cin_r = F::rand(rng);
     let random: symmetric::Randomness<F> = symmetric::Randomness { r: cin_r.clone() };
     let key: symmetric::SymmetricKey<F> = symmetric::SymmetricKey { k: k_data };
-    // let ct_data: symmetric::Ciphertext<F> = SEEnc::encrypt(
-    //     rc.clone(),
-    //     random.clone(),
-    //     key.clone(),
-    //     symmetric::Plaintext { m: data },
-    // )    .unwrap();
-
-    let ct_data = F::rand(rng);
+    let ct_data: symmetric::Ciphertext<F> = SEEnc::encrypt(
+        rc.clone(),
+        random.clone(),
+        key.clone(),
+        symmetric::Plaintext { m: data },
+    )
+    .unwrap();
 
     //==============================================================================================================
 
     let h_ct: ark_ff::Fp<ark_ff::MontBackend<ark_bn254::FrConfig, 4>, 4> =
-        H::evaluate(&rc.clone(), [ct_data.clone()].to_vec()).unwrap();
+        H::evaluate(&rc.clone(), [ct_data.c.clone()].to_vec()).unwrap();
 
-    Ok(Tiger {
+    Ok(Dog {
         rc: rc.clone().round_constants,
         h_ct: Some(h_ct),
-        h_k_data: Some(h_k_data),
-        pk_peer_own: Some(pk_peer_own),
-        k_data: Some(k_data),
-        ct_data: Some(ct_data),
+        ct_data: Some(ct_data.c),
         _curve_var: std::marker::PhantomData,
     })
 }
@@ -200,14 +172,9 @@ fn test_Data() {
 
     println!("{:?}", proof);
 
-    let mut image: Vec<_> = vec![
-        test_input.h_k_data.clone().unwrap(),
-        test_input.pk_peer_own.clone().unwrap(),
-    ];
-    image.append(&mut vec![test_input.h_ct.clone().unwrap()]);
-    // image.append(&mut test_input.cin.clone().unwrap());
+    let image = &[test_input.h_ct.clone().unwrap()];
 
-    let tmp = Groth16::<Bn254>::verify_with_processed_vk(&pvk, &image, &proof).unwrap();
-    let tmp2 = Groth16::<Bn254>::verify(&vk, &image, &proof).unwrap();
+    let tmp = Groth16::<Bn254>::verify_with_processed_vk(&pvk, image, &proof).unwrap();
+    let tmp2 = Groth16::<Bn254>::verify(&vk, image, &proof).unwrap();
     println!("\nresult = {:?}", tmp);
 }
