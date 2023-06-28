@@ -35,7 +35,7 @@ use ark_std::marker::PhantomData;
 pub type ConstraintF<C> = <<C as CurveGroup>::BaseField as Field>::BasePrimeField;
 #[allow(non_snake_case)]
 #[derive(Clone)]
-pub struct Registerdata<C: CurveGroup, GG: CurveVar<C, ConstraintF<C>>>
+pub struct Tiger<C: CurveGroup, GG: CurveVar<C, ConstraintF<C>>>
 where
     <C as CurveGroup>::BaseField: PrimeField + Absorb,
 {
@@ -48,16 +48,14 @@ where
     pub pk_peer_own: Option<C::BaseField>,
 
     // witness
-    pub data: Option<C::BaseField>,
     pub k_data: Option<C::BaseField>,
-    pub ct_r: Option<C::BaseField>,
     pub ct_data: Option<C::BaseField>,
 
     pub _curve_var: PhantomData<GG>,
 }
 
 #[allow(non_snake_case)]
-impl<C, GG> ConstraintSynthesizer<C::BaseField> for Registerdata<C, GG>
+impl<C, GG> ConstraintSynthesizer<C::BaseField> for Tiger<C, GG>
 where
     C: CurveGroup,
     GG: CurveVar<C, C::BaseField>,
@@ -114,71 +112,7 @@ where
         let hash_input = [ct_data_binding].to_vec();
         let result_h_ct = MiMCGadget::<C::BaseField>::evaluate(&rc, &hash_input).unwrap();
 
-        result_h_ct.enforce_equal(&h_ct).unwrap();
-
-        //==============================================================================================================
-
-        // ct_data = SE.Enc(data,k_data)
-        let randomness: symmetric::Randomness<_> = symmetric::Randomness {
-            r: self.ct_r.clone().unwrap(),
-        };
-        let ct_r =
-            symmetric::constraints::RandomnessVar::new_witness(ark_relations::ns!(cs, "r"), || {
-                Ok(randomness)
-            })
-            .unwrap();
-
-        let binding = self.ct_data.clone().unwrap();
-
-        let ct_data: symmetric::constraints::CiphertextVar<C::BaseField> =
-            <SymmetricEncryptionSchemeGadget<C::BaseField> as SymmetricEncryptionGadget<
-                SymmetricEncryptionScheme<C::BaseField>,
-                C::BaseField,
-            >>::CiphertextVar::new_witness(
-                ark_relations::ns!(cs, "ct_data"),
-                || {
-                    Ok(symmetric::Ciphertext {
-                        r: self.ct_r.unwrap(),
-                        c: binding,
-                    })
-                }, // tk_addr_ena_old
-            )
-            .unwrap();
-
-        let data = <SymmetricEncryptionSchemeGadget<C::BaseField> as SymmetricEncryptionGadget<
-            SymmetricEncryptionScheme<C::BaseField>,
-            C::BaseField,
-        >>::PlaintextVar::new_witness(
-            ark_relations::ns!(cs, "data"),
-            || {
-                Ok(symmetric::Plaintext {
-                    m: self.data.unwrap(),
-                })
-            }, // tk_addr_ena_old
-        )
-        .unwrap();
-
-        let binding = self.k_data.clone().unwrap();
-
-        let k_data = <SymmetricEncryptionSchemeGadget<C::BaseField> as SymmetricEncryptionGadget<
-            SymmetricEncryptionScheme<C::BaseField>,
-            C::BaseField,
-        >>::SymmetricKeyVar::new_witness(
-            ark_relations::ns!(cs, "k_data"),
-            || Ok(symmetric::SymmetricKey { k: binding }),
-        )
-        .unwrap();
-
-        let result_ct_data = SymmetricEncryptionSchemeGadget::<C::BaseField>::encrypt(
-            rc.clone(),
-            ct_r,
-            k_data.clone(),
-            data.clone(),
-        )
-        .unwrap();
-
-        result_ct_data.enforce_equal(&ct_data)
-        //==============================================================================================================
+        result_h_ct.enforce_equal(&h_ct)
     }
 }
 
@@ -195,7 +129,7 @@ type H = mimc7::MiMC<F>;
 type SEEnc = symmetric::SymmetricEncryptionScheme<F>;
 
 #[allow(non_snake_case)]
-fn generate_test_input() -> Result<Registerdata<C, GG>, Error> {
+fn generate_test_input() -> Result<Tiger<C, GG>, Error> {
     let rng = &mut test_rng();
     let rc: mimc7::Parameters<F> = mimc7::Parameters {
         round_constants: mimc7::parameters::get_bn256_round_constants(),
@@ -210,7 +144,6 @@ fn generate_test_input() -> Result<Registerdata<C, GG>, Error> {
 
     let data = F::rand(rng);
     let cin_r = F::rand(rng);
-    let sk = F::rand(rng);
     let random = symmetric::Randomness { r: cin_r.clone() };
     let key = symmetric::SymmetricKey { k: k_data };
     let ct_data = SEEnc::encrypt(
@@ -225,14 +158,12 @@ fn generate_test_input() -> Result<Registerdata<C, GG>, Error> {
 
     let h_ct = H::evaluate(&rc.clone(), [ct_data.clone().c].to_vec()).unwrap();
 
-    Ok(Registerdata {
+    Ok(Tiger {
         rc: rc.clone().round_constants,
         h_ct: Some(h_ct),
         h_k_data: Some(h_k_data),
         pk_peer_own: Some(pk_peer_own),
-        data: Some(data),
         k_data: Some(k_data),
-        ct_r: Some(cin_r),
         ct_data: Some(ct_data.c),
         _curve_var: std::marker::PhantomData,
     })
