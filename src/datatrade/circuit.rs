@@ -48,10 +48,10 @@ where
     pub pk_peer_own: Option<C::BaseField>,
 
     // witness
-    pub data: Option<C::BaseField>,
+    pub data: Option<Vec<C::BaseField>>,
     pub k_data: Option<C::BaseField>,
     pub ct_r: Option<C::BaseField>,
-    pub ct_data: Option<C::BaseField>,
+    pub ct_data: Option<Vec<C::BaseField>>,
 
     pub _curve_var: PhantomData<GG>,
 }
@@ -108,10 +108,12 @@ where
             FpVar::new_input(ark_relations::ns!(cs, "h_ct"), || Ok(self.h_ct.unwrap())).unwrap();
 
         let binding = self.ct_data.clone().unwrap();
-        let ct_data_binding =
-            FpVar::new_witness(ark_relations::ns!(cs, "ct_data"), || Ok(binding)).unwrap();
+        let ct_data_binding: Vec<FpVar<<C as CurveGroup>::BaseField>> = binding
+            .iter()
+            .map(|i| FpVar::new_witness(ark_relations::ns!(cs, "ct_data{i}"), || Ok(i)).unwrap())
+            .collect();
 
-        let hash_input = [ct_data_binding].to_vec();
+        let hash_input = ct_data_binding;
         let result_h_ct = MiMCGadget::<C::BaseField>::evaluate(&rc, &hash_input).unwrap();
 
         result_h_ct.enforce_equal(&h_ct).unwrap();
@@ -130,33 +132,41 @@ where
 
         let binding = self.ct_data.clone().unwrap();
 
-        let ct_data: symmetric::constraints::CiphertextVar<C::BaseField> =
-            <SymmetricEncryptionSchemeGadget<C::BaseField> as SymmetricEncryptionGadget<
-                SymmetricEncryptionScheme<C::BaseField>,
-                C::BaseField,
-            >>::CiphertextVar::new_witness(
-                ark_relations::ns!(cs, "ct_data"),
-                || {
-                    Ok(symmetric::Ciphertext {
-                        r: self.ct_r.unwrap(),
-                        c: binding,
-                    })
-                }, // tk_addr_ena_old
-            )
-            .unwrap();
+        let ct_data: Vec<symmetric::constraints::CiphertextVar<C::BaseField>> = binding
+            .iter()
+            .map(|i| {
+                <SymmetricEncryptionSchemeGadget<C::BaseField> as SymmetricEncryptionGadget<
+                    SymmetricEncryptionScheme<C::BaseField>,
+                    C::BaseField,
+                >>::CiphertextVar::new_witness(
+                    ark_relations::ns!(cs, "ct_data{i}"),
+                    || {
+                        Ok(symmetric::Ciphertext {
+                            r: self.ct_r.unwrap(),
+                            c: *i,
+                        })
+                    }, // tk_addr_ena_old
+                )
+                .unwrap()
+            })
+            .collect();
 
-        let data = <SymmetricEncryptionSchemeGadget<C::BaseField> as SymmetricEncryptionGadget<
-            SymmetricEncryptionScheme<C::BaseField>,
-            C::BaseField,
-        >>::PlaintextVar::new_witness(
-            ark_relations::ns!(cs, "data"),
-            || {
-                Ok(symmetric::Plaintext {
-                    m: self.data.unwrap(),
-                })
-            }, // tk_addr_ena_old
-        )
-        .unwrap();
+        let data: Vec<symmetric::constraints::PlaintextVar<C::BaseField>> = self
+            .data
+            .clone()
+            .unwrap()
+            .iter()
+            .map(|i| {
+                <SymmetricEncryptionSchemeGadget<C::BaseField> as SymmetricEncryptionGadget<
+                    SymmetricEncryptionScheme<C::BaseField>,
+                    C::BaseField,
+                >>::PlaintextVar::new_witness(
+                    ark_relations::ns!(cs, "data{i}"),
+                    || Ok(symmetric::Plaintext { m: *i }), // tk_addr_ena_old
+                )
+                .unwrap()
+            })
+            .collect();
 
         let binding = self.k_data.clone().unwrap();
 
@@ -169,15 +179,20 @@ where
         )
         .unwrap();
 
-        let result_ct_data = SymmetricEncryptionSchemeGadget::<C::BaseField>::encrypt(
-            rc.clone(),
-            ct_r,
-            k_data.clone(),
-            data.clone(),
-        )
-        .unwrap();
+        for i in 0..self.data.unwrap().len() {
+            let result_ct_data = SymmetricEncryptionSchemeGadget::<C::BaseField>::encrypt(
+                rc.clone(),
+                ct_r.clone(),
+                k_data.clone(),
+                data[i].clone(),
+            )
+            .unwrap();
 
-        result_ct_data.enforce_equal(&ct_data)
+            result_ct_data.enforce_equal(&ct_data[i]);
+        }
+
+        Ok(())
+
         //==============================================================================================================
     }
 }
@@ -205,22 +220,45 @@ pub fn generate_test_input() -> Result<Registerdata<C, GG>, Error> {
         H::evaluate(&rc.clone(), [pk_peer_own.clone(), k_data.clone()].to_vec()).unwrap();
     //==============================================================================================================
 
-    let data = F::rand(rng);
+    let mut data: Vec<F> = Vec::new();
+    let mut ct_data: Vec<F> = Vec::new();
+    for i in 0..45 {
+        data.push(F::rand(rng));
+    }
     let cin_r = F::rand(rng);
-    let sk = F::rand(rng);
     let random = symmetric::Randomness { r: cin_r.clone() };
     let key = symmetric::SymmetricKey { k: k_data };
-    let ct_data = SEEnc::encrypt(
-        rc.clone(),
-        random.clone(),
-        key.clone(),
-        symmetric::Plaintext { m: data },
-    )
-    .unwrap();
+
+    for i in 0..45 {
+        ct_data.push(
+            SEEnc::encrypt(
+                rc.clone(),
+                random.clone(),
+                key.clone(),
+                symmetric::Plaintext { m: data[i] },
+            )
+            .unwrap()
+            .c,
+        )
+    }
 
     //==============================================================================================================
 
-    let h_ct = H::evaluate(&rc.clone(), [ct_data.clone().c].to_vec()).unwrap();
+    // let data = F::rand(rng);
+    // let cin_r = F::rand(rng);
+    // let random = symmetric::Randomness { r: cin_r.clone() };
+    // let key = symmetric::SymmetricKey { k: k_data };
+    // let ct_data = SEEnc::encrypt(
+    //     rc.clone(),
+    //     random.clone(),
+    //     key.clone(),
+    //     symmetric::Plaintext { m: data },
+    // )
+    // .unwrap();
+
+    //==============================================================================================================
+
+    let h_ct = H::evaluate(&rc.clone(), ct_data.clone()).unwrap();
 
     Ok(Registerdata {
         rc: rc.clone().round_constants,
@@ -230,15 +268,15 @@ pub fn generate_test_input() -> Result<Registerdata<C, GG>, Error> {
         data: Some(data),
         k_data: Some(k_data),
         ct_r: Some(cin_r),
-        ct_data: Some(ct_data.c),
+        ct_data: Some(ct_data),
         _curve_var: std::marker::PhantomData,
     })
 }
 
-#[test]
-fn test_Data() {
+// #[test]
+pub fn test_Data() -> bool {
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
-    println!("\nGenerate input!\n");
+    // println!("\nGenerate input!\n");
 
     let test_input = generate_test_input().unwrap();
 
@@ -248,15 +286,18 @@ fn test_Data() {
         Groth16::<Bn254>::setup(c, &mut rng).unwrap()
     };
 
-    println!("\nPrepared verifying key!\n");
+    // println!("\nPrepared verifying key!\n");
     let pvk = Groth16::<Bn254>::process_vk(&vk).unwrap();
 
-    println!("\nGenerate proof!\n");
+    // println!("\nGenerate proof!\n");
 
     let c = test_input.clone();
     let proof = Groth16::<Bn254>::prove(&pk, c, &mut rng).unwrap();
 
-    println!("{:?}", proof);
+    // println!("{:?}", proof);
+
+    // let h_k_data_string: String = test_input.h_k_data.unwrap().to_string();
+    // let h_k_data: Result<F, _> = F::from_str(&h_k_data_string);
 
     let mut image: Vec<_> = vec![
         test_input.h_k_data.clone().unwrap(),
@@ -266,7 +307,7 @@ fn test_Data() {
 
     let tmp = Groth16::<Bn254>::verify_with_processed_vk(&pvk, &image, &proof).unwrap();
     let tmp2 = Groth16::<Bn254>::verify(&vk, &image, &proof).unwrap();
-    println!("\nresult = {:?}", tmp);
+    tmp
 }
 
 use std::str::FromStr;
