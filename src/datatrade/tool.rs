@@ -17,13 +17,14 @@ use ark_r1cs_std::prelude::*;
 use ark_r1cs_std::{fields::fp::FpVar, prelude::AllocVar};
 use ark_relations::r1cs::{ConstraintSynthesizer, SynthesisError};
 use ark_std::marker::PhantomData;
+use json_writer::JSONObjectWriter;
 
 // mod circuit;
 use crate::datatrade::circuit::{generate_test_input, Registerdata};
 
 fn setup() {
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
-    let test_input = generate_test_input().unwrap();
+    let test_input = generate_test_input(22).unwrap();
 
     let (pk, vk) = {
         let c = test_input.clone();
@@ -34,10 +35,3 @@ fn setup() {
 
     // save pk && save pvk
 }
-
-fn make_proof() {}
-
-fn verify() {}
-
-#[test]
-fn test_tool() {}

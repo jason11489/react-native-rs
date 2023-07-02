@@ -2,17 +2,16 @@ pub type Error = Box<dyn ark_std::error::Error>;
 
 pub mod datatrade;
 pub mod gadget;
+
 use crate::datatrade::circuit::cat;
 use crate::datatrade::circuit::test_data;
-
+use cocoa::base::nil;
+use cocoa::foundation::NSString;
+use std::ffi::CString;
 #[no_mangle]
 pub extern "C" fn add_numbers(a: i32, b: i32) -> i32 {
-    let mut tmp = 0;
-    if test_data() == true {
-        tmp = tmp + 1;
-    }
     // test_Data();
-    a + b + tmp
+    a + b
 }
 
 #[no_mangle]
@@ -26,8 +25,10 @@ pub extern "C" fn hello_world() {
 }
 
 #[no_mangle]
-pub extern "C" fn test_circuit() -> bool {
-    test_data()
+pub extern "C" fn test_circuit() -> CString {
+    let mut tiger = test_data();
+    let c_string = CString::new(tiger.as_bytes()).expect("CString::new failed");
+    c_string
 }
 
 #[cfg(test)]

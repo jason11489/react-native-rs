@@ -23,6 +23,9 @@ ark-serialize = "0.4.2"
 ark-std = "0.4.0"
 derivative = "2.2.0"
 ark-bn254 = "0.4.0"
+json = "0.12.4"
+json-writer = "0.2.1"
+cocoa = "0.24.1"
 
 [dev-dependencies]
 ark-bls12-381 = "0.4.0"
@@ -32,4 +35,7 @@ num-bigint = "0.4.3"
 default = ["ark-crypto-primitives/r1cs"]
 
 [profile.release]
+opt-level = 3
+
+[profile.test]
 opt-level = 3

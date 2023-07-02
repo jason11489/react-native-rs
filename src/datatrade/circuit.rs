@@ -13,6 +13,11 @@ use crate::gadget::{
     },
 };
 use ark_crypto_primitives::snark::{CircuitSpecificSetupSNARK, SNARK};
+use ark_groth16::r1cs_to_qap::evaluate_constraint;
+use std::fs::File;
+use std::fs::{read, write};
+use std::io::Write;
+use std::path::PathBuf;
 
 use ark_bn254::Bn254;
 use ark_groth16::Groth16;
@@ -21,6 +26,7 @@ use ark_std::rand::SeedableRng;
 use ark_std::test_rng;
 use ark_std::UniformRand;
 use ark_std::Zero;
+use json_writer::JSONObjectWriter;
 
 use ark_crypto_primitives::Error;
 
@@ -191,6 +197,8 @@ where
             result_ct_data.enforce_equal(&ct_data[i]);
         }
 
+        println!("tiger = {:?}", cs.num_constraints());
+
         Ok(())
 
         //==============================================================================================================
@@ -207,7 +215,7 @@ type H = mimc7::MiMC<F>;
 type SEEnc = symmetric::SymmetricEncryptionScheme<F>;
 
 #[allow(non_snake_case)]
-pub fn generate_test_input() -> Result<Registerdata<C, GG>, Error> {
+pub fn generate_test_input(n: usize) -> Result<Registerdata<C, GG>, Error> {
     let rng = &mut test_rng();
     let rc: mimc7::Parameters<F> = mimc7::Parameters {
         round_constants: mimc7::parameters::get_bn256_round_constants(),
@@ -222,14 +230,14 @@ pub fn generate_test_input() -> Result<Registerdata<C, GG>, Error> {
 
     let mut data: Vec<F> = Vec::new();
     let mut ct_data: Vec<F> = Vec::new();
-    for i in 0..45 {
+    for i in 0..n {
         data.push(F::rand(rng));
     }
     let cin_r = F::rand(rng);
     let random = symmetric::Randomness { r: cin_r.clone() };
     let key = symmetric::SymmetricKey { k: k_data };
 
-    for i in 0..45 {
+    for i in 0..n {
         ct_data.push(
             SEEnc::encrypt(
                 rc.clone(),
@@ -273,12 +281,15 @@ pub fn generate_test_input() -> Result<Registerdata<C, GG>, Error> {
     })
 }
 
-// #[test]
-pub fn test_data() -> bool {
+#[test]
+pub fn test_dog() {
+    // let mut object_str = String::new();
+    // let mut object_writer = JSONObjectWriter::new(&mut object_str);
+
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
     // println!("\nGenerate input!\n");
 
-    let test_input = generate_test_input().unwrap();
+    let test_input = generate_test_input(525).unwrap();
 
     let (pk, vk) = {
         let c = test_input.clone();
@@ -287,27 +298,115 @@ pub fn test_data() -> bool {
     };
 
     // println!("\nPrepared verifying key!\n");
-    let pvk = Groth16::<Bn254>::process_vk(&vk).unwrap();
+    let pvk: ark_groth16::PreparedVerifyingKey<Bn<ark_bn254::Config>> =
+        Groth16::<Bn254>::process_vk(&vk).unwrap();
+
+    // object_writer.value("alpha_g1", vk.alpha_g1.to_string().as_str());
+    // object_writer.value("beta_g2", vk.beta_g2.to_string().as_str());
+    // object_writer.value("gamma_g2", vk.gamma_g2.to_string().as_str());
+    // object_writer.value("delta_g2", vk.delta_g2.to_string().as_str());
+
+    // let mut vk_gamma_abc_g1 = String::new();
+
+    // for i in 0..vk.gamma_abc_g1.len() {
+    //     vk_gamma_abc_g1.push_str(vk.gamma_abc_g1[i].to_string().as_str());
+    // }
+
+    // object_writer.value("gamma_abc_g1", vk_gamma_abc_g1.as_str());
+    // object_writer.end();
+
+    // let mut save_ped_path = String::new();
+    // save_ped_path.push_str("./vk.json");
+    // let mut file = File::create(abs_path(save_ped_path.as_str())).unwrap();
+    // file.write_all(object_str.as_bytes());
 
     // println!("\nGenerate proof!\n");
 
     let c = test_input.clone();
     let proof = Groth16::<Bn254>::prove(&pk, c, &mut rng).unwrap();
 
+    // let mut object_str = String::new();
+    // let mut object_writer = JSONObjectWriter::new(&mut object_str);
+    // object_writer.value("a", proof.a.to_string().as_str());
+    // object_writer.value("b", proof.b.to_string().as_str());
+    // object_writer.value("c", proof.c.to_string().as_str());
+    // object_writer.end();
+
+    // let mut save_ped_path = String::new();
+    // save_ped_path.push_str("./proof.json");
+    // let mut file = File::create(abs_path(save_ped_path.as_str())).unwrap();
+    // file.write_all(object_str.as_bytes());
+
     // println!("{:?}", proof);
 
     // let h_k_data_string: String = test_input.h_k_data.unwrap().to_string();
     // let h_k_data: Result<F, _> = F::from_str(&h_k_data_string);
 
-    let mut image: Vec<_> = vec![
-        test_input.h_k_data.clone().unwrap(),
-        test_input.pk_peer_own.clone().unwrap(),
-    ];
-    image.append(&mut vec![test_input.h_ct.clone().unwrap()]);
+    // let mut image: Vec<_> = vec![
+    //     test_input.h_k_data.clone().unwrap(),
+    //     test_input.pk_peer_own.clone().unwrap(),
+    // ];
+    // image.append(&mut vec![test_input.h_ct.clone().unwrap()]);
 
-    let tmp: bool = Groth16::<Bn254>::verify_with_processed_vk(&pvk, &image, &proof).unwrap();
-    let tmp2 = Groth16::<Bn254>::verify(&vk, &image, &proof).unwrap();
-    return tmp;
+    // let tmp: bool = Groth16::<Bn254>::verify_with_processed_vk(&pvk, &image, &proof).unwrap();
+    // let tmp2 = Groth16::<Bn254>::verify(&vk, &image, &proof).unwrap();
+}
+
+pub fn test_data() -> String {
+    let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
+    // println!("\nGenerate input!\n");
+
+    let test_input = generate_test_input(540).unwrap();
+
+    let (pk, vk) = {
+        let c = test_input.clone();
+
+        Groth16::<Bn254>::setup(c, &mut rng).unwrap()
+    };
+
+    // println!("\nPrepared verifying key!\n");
+    let pvk: ark_groth16::PreparedVerifyingKey<Bn<ark_bn254::Config>> =
+        Groth16::<Bn254>::process_vk(&vk).unwrap();
+    let mut object_str = String::new();
+    let mut object_writer = JSONObjectWriter::new(&mut object_str);
+
+    object_writer.value("alpha_g1", vk.alpha_g1.to_string().as_str());
+    object_writer.value("beta_g2", vk.beta_g2.to_string().as_str());
+    object_writer.value("gamma_g2", vk.gamma_g2.to_string().as_str());
+    object_writer.value("delta_g2", vk.delta_g2.to_string().as_str());
+
+    let mut vk_gamma_abc_g1 = String::new();
+
+    for i in 0..vk.gamma_abc_g1.len() {
+        vk_gamma_abc_g1.push_str(vk.gamma_abc_g1[i].to_string().as_str());
+    }
+
+    object_writer.value("gamma_abc_g1", vk_gamma_abc_g1.as_str());
+
+    // println!("\nGenerate proof!\n");
+
+    let c = test_input.clone();
+    let proof = Groth16::<Bn254>::prove(&pk, c, &mut rng).unwrap();
+
+    object_writer.value("a", proof.a.to_string().as_str());
+    object_writer.value("b", proof.b.to_string().as_str());
+    object_writer.value("c", proof.c.to_string().as_str());
+    object_writer.end();
+
+    // println!("{:?}", proof);
+
+    // let h_k_data_string: String = test_input.h_k_data.unwrap().to_string();
+    // let h_k_data: Result<F, _> = F::from_str(&h_k_data_string);
+
+    // let mut image: Vec<_> = vec![
+    //     test_input.h_k_data.clone().unwrap(),
+    //     test_input.pk_peer_own.clone().unwrap(),
+    // ];
+    // image.append(&mut vec![test_input.h_ct.clone().unwrap()]);
+
+    // let tmp: bool = Groth16::<Bn254>::verify_with_processed_vk(&pvk, &image, &proof).unwrap();
+    // let tmp2 = Groth16::<Bn254>::verify(&vk, &image, &proof).unwrap();
+    return object_str.clone();
 }
 
 use std::str::FromStr;
@@ -334,6 +433,13 @@ fn test_string_to_fr() {
     }
 }
 
-pub fn cat(a: i32, b: i32) -> i32 {
+#[no_mangle]
+pub extern "C" fn cat(a: i32, b: i32) -> i32 {
     a + b
+}
+
+pub fn abs_path(relative_path: &str) -> String {
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push(relative_path);
+    path.to_string_lossy().to_string()
 }
