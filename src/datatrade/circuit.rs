@@ -274,7 +274,7 @@ pub fn generate_test_input() -> Result<Registerdata<C, GG>, Error> {
 }
 
 // #[test]
-pub fn test_Data() -> bool {
+pub fn test_data() -> bool {
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(test_rng().next_u64());
     // println!("\nGenerate input!\n");
 
@@ -305,15 +305,15 @@ pub fn test_Data() -> bool {
     ];
     image.append(&mut vec![test_input.h_ct.clone().unwrap()]);
 
-    let tmp = Groth16::<Bn254>::verify_with_processed_vk(&pvk, &image, &proof).unwrap();
+    let tmp: bool = Groth16::<Bn254>::verify_with_processed_vk(&pvk, &image, &proof).unwrap();
     let tmp2 = Groth16::<Bn254>::verify(&vk, &image, &proof).unwrap();
-    tmp
+    return tmp;
 }
 
 use std::str::FromStr;
 
 #[test]
-fn test_string_to_Fr() {
+fn test_string_to_fr() {
     let rng = &mut test_rng();
 
     let fr_value: F = F::rand(rng);
@@ -332,4 +332,8 @@ fn test_string_to_Fr() {
             println!("잘못된 문자열입니다.");
         }
     }
+}
+
+pub fn cat(a: i32, b: i32) -> i32 {
+    a + b
 }

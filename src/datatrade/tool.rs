@@ -33,11 +33,6 @@ fn setup() {
     let pvk = Groth16::<Bn254>::process_vk(&vk).unwrap();
 
     // save pk && save pvk
-
-
-
-
-
 }
 
 fn make_proof() {}

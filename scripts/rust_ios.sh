@@ -7,8 +7,8 @@ cargo build --target x86_64-apple-ios --release
 
 # create a universal static library
 lipo -create -output ./rust_lib/lib_rust.a \
-    target/aarch64-apple-ios/release/librust_module.a \
-    target/x86_64-apple-ios/release/librust_module.a
+    target/aarch64-apple-ios/release/libmy_rust_module.a \
+    target/x86_64-apple-ios/release/libmy_rust_module.a
 
 
 # Generate header file
